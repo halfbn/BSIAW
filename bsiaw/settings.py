@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'myapp',
 ]
 
 MIDDLEWARE = [
@@ -120,3 +121,12 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'protected'
+LOGOUT_REDIRECT_URL = 'index'
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = False  # True w HTTPS
+SESSION_COOKIE_SAMESITE = 'Lax'
+
