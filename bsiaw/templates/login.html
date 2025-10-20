@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <title>Strona dla wszystkich</title>
+    <title>Logowanie</title>
     <style>
         .top-right {
             position: absolute;
@@ -17,15 +17,9 @@
     {% if user.is_authenticated %}
         <div class="top-right">Zalogowany jako: {{ user.username }}</div>
     {% endif %}
-    <h1>strona dla wszystkich</h1>
-    <a href="/private/">Przejdź do strony dla zalogowanych</a>
-    {% if user.is_authenticated %}
-        <a href="/logout/">Wyloguj się</a>
-    {% else %}
-        <a href="/login/">Zaloguj się</a>
-    {% endif %}
+    <h1>Logowanie</h1>
+    <a href="/">Wróć na stronę główną</a>
     <hr>
-    <h2>Rejestracja użytkownika</h2>
     {% if messages %}
         <ul>
         {% for message in messages %}
@@ -36,7 +30,7 @@
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
-        <button type="submit">Zarejestruj</button>
+        <button type="submit">Zaloguj</button>
     </form>
 </body>
 </html>
