@@ -54,7 +54,7 @@ ROOT_URLCONF = 'bsiaw.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'bsiaw' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

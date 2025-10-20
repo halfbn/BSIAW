@@ -16,7 +16,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from bsiaw import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', views.public_view, name='public'),
+    path('private/', views.private_view, name='private'),
 ]
