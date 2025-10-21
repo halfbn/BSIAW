@@ -11,8 +11,6 @@ def public_view(request):
             form.save()
             messages.success(request, 'Rejestracja zakończona sukcesem! Możesz się teraz zalogować.')
             return redirect('public')
-        else:
-            messages.error(request, 'Wystąpił błąd w formularzu. Popraw dane.')
     else:
         form = UserCreationForm()
     return render(request, 'public.html', {'form': form})
@@ -25,8 +23,6 @@ def login_view(request):
             login(request, user)
             messages.success(request, 'Zalogowano pomyślnie!')
             return redirect('private')
-        else:
-            messages.error(request, 'Nieprawidłowe dane logowania.')
     else:
         form = AuthenticationForm()
     return render(request, 'login.html', {'form': form})

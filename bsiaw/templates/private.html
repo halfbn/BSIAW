@@ -15,10 +15,10 @@
 </head>
 <body>
     {% if user.is_authenticated %}
-        <div class="top-right">Zalogowany jako: {{ user.username }}</div>
+        <div class="top-right">zalogowany jako: {{ user.username }}</div>
     {% endif %}
     <h1>strona dla zalogowanych</h1>
-    <a href="/logout/">Wyloguj</a>
+    <a href="/logout/">wyloguj</a>
     <a href="/">powrót</a>
 </body>
 </html>

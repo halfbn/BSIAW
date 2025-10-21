@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <title>Strona dla wszystkich</title>
+    <title>strona dla wszystkich</title>
     <style>
         .top-right {
             position: absolute;
@@ -15,17 +15,17 @@
 </head>
 <body>
     {% if user.is_authenticated %}
-        <div class="top-right">Zalogowany jako: {{ user.username }}</div>
+        <div class="top-right">zalogowany jako: {{ user.username }}</div>
     {% endif %}
     <h1>strona dla wszystkich</h1>
-    <a href="/private/">Przejdź do strony dla zalogowanych</a>
+    <a href="/private/">dla zalogowanych</a>
     {% if user.is_authenticated %}
-        <a href="/logout/">Wyloguj się</a>
+        <a href="/logout/">wyloguj się</a>
     {% else %}
-        <a href="/login/">Zaloguj się</a>
+        <a href="/login/">zaloguj się</a>
     {% endif %}
     <hr>
-    <h2>Rejestracja użytkownika</h2>
+    <h2>rejestracja użytkownika</h2>
     {% if messages %}
         <ul>
         {% for message in messages %}
