@@ -1,6 +1,5 @@
 from django.contrib import admin
 from django.contrib.sessions.models import Session
-
 # Rejestracja modelu Session w panelu admin
 @admin.register(Session)
 class SessionAdmin(admin.ModelAdmin):
