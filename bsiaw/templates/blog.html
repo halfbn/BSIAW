@@ -1,0 +1,23 @@
+{% load static %}
+<html>
+    <h1>testowy artykul zjadlbym pizze</h1>
+    <img src="{% static 'pizza.png' %}" width="150">
+    <hr>
+    <h1>nowy komentarz</h1>
+    <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Wyślij komentarz</button>
+    </form>
+    <hr>
+    <h2>Wszystkie komentarze:</h2>
+    {% for comment in comments %}
+        <div>
+            <strong>{{ comment.author }}</strong> napisał:
+            <p>{{ comment.content }}</p>
+            <hr>
+        </div>
+    {% empty %}
+        <p>Brak komentarzy</p>
+    {% endfor %}
+</html>

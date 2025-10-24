@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Strona dla zalogowanych</title>
+    <style>
+        .top-right {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 1em;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    {% if user.is_authenticated %}
+        <div class="top-right">zalogowany jako: {{ user.username }}</div>
+    {% endif %}
+    <h1>strona dla zalogowanych</h1>
+    <a href="/logout/">wyloguj</a>
+    <a href="/">powrót</a>
+</body>
+</html>
