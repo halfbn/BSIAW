@@ -1,9 +1,17 @@
 {% load static %}
+{% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+      <li class="{{ message.tags }}">{{ message }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
 <html>
     <h1>testowy artykul zjadlbym pizze</h1>
     <img src="{% static 'pizza.png' %}" width="150">
     <hr>
     <h1>nowy komentarz</h1>
+    Piszesz jako: <b>{{ username }}</b>
     <form method="post">
     {% csrf_token %}
     {{ form.as_p }}
@@ -13,7 +21,7 @@
     <h2>Wszystkie komentarze:</h2>
     {% for comment in comments %}
         <div>
-            <strong>{{ comment.author }}</strong> napisał:
+            <strong>O {{ comment.created_at|date:"H:i:s" }} dnia {{ comment.created_at|date:"d-m-Y" }}, {{ comment.author }}</strong> napisał:
             <p>{{ comment.content }}</p>
             <hr>
         </div>
