@@ -1,14 +1,14 @@
-FROM python:3.13
+FROM python:3.10-slim
+
+RUN apt-get update && apt-get install -y nginx
+RUN pip install gunicorn
 
 WORKDIR /bsiaw
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
 COPY . .
 
-ENV PYTHONUNBUFFERED=1
+RUN pip install -r requirements.txt
 
-EXPOSE 8000
+COPY nginx.conf /etc/nginx/sites-available/default
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD service nginx start && gunicorn --bind 0.0.0.0:8000 bsiaw.wsgi:application
