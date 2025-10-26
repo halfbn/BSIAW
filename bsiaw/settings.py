@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'bsiaw',
     'blog123',
+    'myapp',  
 ]
 
 MIDDLEWARE = [
@@ -123,9 +124,17 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = 'protected'
+LOGOUT_REDIRECT_URL = 'index'
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = False  # True w HTTPS
+SESSION_COOKIE_SAMESITE = 'Lax'
+
+
 # Bezpieczne ustawienia dla ciasteczek sesji
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = False
 SESSION_COOKIE_SAMESITE = 'Lax'
-
-LOGIN_URL = '/login/'
