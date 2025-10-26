@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Logowanie</title>
+    <style>
+        .top-right {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 1em;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    {% if user.is_authenticated %}
+        <div class="top-right">Zalogowany jako: {{ user.username }}</div>
+    {% endif %}
+    <h1>Logowanie</h1>
+    <a href="/">Wróć na stronę główną</a>
+    <hr>
+    {% if messages %}
+        <ul>
+        {% for message in messages %}
+            <li>{{ message }}</li>
+        {% endfor %}
+        </ul>
+    {% endif %}
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Zaloguj</button>
+    </form>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>strona dla wszystkich</title>
+    <style>
+        .top-right {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 1em;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    {% if user.is_authenticated %}
+        <div class="top-right">zalogowany jako: {{ user.username }}</div>
+    {% endif %}
+    <h1>strona dla wszystkich</h1>
+    <a href="/private/">dla zalogowanych</a>
+    {% if user.is_authenticated %}
+        <a href="/logout/">wyloguj się</a>
+    {% else %}
+        <a href="/login/">zaloguj się</a>
+    {% endif %}
+    <hr>
+    <h2>rejestracja użytkownika</h2>
+    {% if messages %}
+        <ul>
+        {% for message in messages %}
+            <li>{{ message }}</li>
+        {% endfor %}
+        </ul>
+    {% endif %}
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Zarejestruj</button>
+    </form>
+</body>
+</html>
