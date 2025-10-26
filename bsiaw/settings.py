@@ -37,8 +37,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+<<<<<<< HEAD
+    'myapp',
+=======
     'bsiaw',
     'blog123',
+>>>>>>> origin/main
 ]
 
 MIDDLEWARE = [
@@ -123,7 +127,18 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+<<<<<<< HEAD
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'protected'
+LOGOUT_REDIRECT_URL = 'index'
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = False  # True w HTTPS
+SESSION_COOKIE_SAMESITE = 'Lax'
+
+=======
 # Bezpieczne ustawienia dla ciasteczek sesji
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = False
 SESSION_COOKIE_SAMESITE = 'Lax'
+>>>>>>> origin/main
