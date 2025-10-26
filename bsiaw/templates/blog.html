@@ -1,7 +1,17 @@
 {% extends 'base.html' %}
 {% load static %}
+
 {% block title %}Blog{% endblock %}
+
 {% block content %}
+{% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+      <li class="{{ message.tags }}">{{ message }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
 <div class="card p-4 mb-4 bg-white shadow-sm">
   <h2 class="mb-3">Lorem Ipsum</h2>
   <img src="{% static 'pizza.png' %}" class="img-fluid rounded mb-3 w-25 d-block mx-auto" alt="Pizza">
@@ -9,20 +19,19 @@
     {{ article_text|linebreaks }}
   </div>
 </div>
+
 <hr>
 <h1 class="mb-3">Nowy komentarz</h1>
+Piszesz jako: <b>{{ username }}</b>
 <form method="post" class="mb-3">
 {% csrf_token %}
-    <div class="mb-3">
-        {{ form.author.label_tag }}
-        {{ form.author }}
-    </div>
     <div class="mb-3">
         {{ form.content.label_tag }}
         {{ form.content }}
     </div>
     <button type="submit" class="btn btn-primary">Wyślij komentarz</button>
 </form>
+
 <hr>
 <h2 class="mb-3">Wszystkie komentarze:</h2>
 {% for comment in comments %}
