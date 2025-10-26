@@ -1,9 +1,0 @@
-<h1>Witaj w aplikacji!</h1>
-{% if user.is_authenticated %}
-  <p>Zalogowany jako: {{ user.username }}</p>
-  <a href="{% url 'protected' %}">Strefa chroniona</a> |
-  <a href="{% url 'logout' %}">Wyloguj</a>
-{% else %}
-  <a href="{% url 'login' %}">Zaloguj</a> |
-  <a href="{% url 'register' %}">Zarejestruj się</a>
-{% endif %}
