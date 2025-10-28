@@ -36,10 +36,11 @@ Piszesz jako: <b>{{ username }}</b>
 <h2 class="mb-3">Wszystkie komentarze:</h2>
 {% for comment in comments %}
     <div class="mb-3 p-2 border rounded bg-white">
-        <strong>{{ comment.author }}</strong> napisał:
+        <strong>O {{ comment.created_at|date:"H:i:s" }} dnia {{ comment.created_at|date:"d-m-Y" }}, {{ comment.author }}</strong> napisał:
         <p>{{ comment.content }}</p>
     </div>
 {% empty %}
     <p>Brak komentarzy</p>
 {% endfor %}
+
 {% endblock %}
