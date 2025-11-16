@@ -53,31 +53,6 @@ jobs:
         run: |
           python manage.py test
 
-  docker:
-    name: Build & Push Docker image
-    runs-on: ubuntu-latest
-    needs: tests  # tylko gdy testy przejdą
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build the Docker image
-        run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/bsiaw:latest .
-
-      - name: Push image
-        run: |
-          docker push ghcr.io/${{ github.repository }}/bsiaw:latest
-
-
   # AWS DEPLOY 
   # deploy:
   #   name: Deploy to AWS ECS
