@@ -9,8 +9,8 @@ COPY . .
 COPY /static/pizza.png /static/pizza.png
 
 RUN pip install -r requirements.txt
-RUN python manage.py migrate
 
 COPY nginx.conf /etc/nginx/sites-available/default
 
-CMD service nginx start && gunicorn --bind 0.0.0.0:8000 bsiaw.wsgi:application
+CMD python manage.py migrate && service nginx start && gunicorn --bind 0.0.0.0:8000 bsiaw.wsgi:application
+
