@@ -1,22 +1,46 @@
-# virtualenv
-.venv/
-venv/
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
-# Django
+# Django stuff:
+*.log
+local_settings.py
 db.sqlite3
-/staticfiles
-media/
+db.sqlite3-journal
 
-# env
+# Environments
 .env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Static files
+/static/
+/staticfiles/
+/media/
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-__pycache__/
-*.pyc
-db.sqlite3
-.venv/
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+.cache
+coverage.xml
+*.cover
+
+# Deployment
+*.log
