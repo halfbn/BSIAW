@@ -1,23 +1,46 @@
+{% extends 'base.html' %}
 {% load static %}
-<html>
-    <h1>testowy artykul zjadlbym pizze</h1>
-    <img src="{% static 'pizza.png' %}" width="150">
-    <hr>
-    <h1>nowy komentarz</h1>
-    <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Wyślij komentarz</button>
-    </form>
-    <hr>
-    <h2>Wszystkie komentarze:</h2>
-    {% for comment in comments %}
-        <div>
-            <strong>{{ comment.author }}</strong> napisał:
-            <p>{{ comment.content }}</p>
-            <hr>
-        </div>
-    {% empty %}
-        <p>Brak komentarzy</p>
+
+{% block title %}Blog{% endblock %}
+
+{% block content %}
+{% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+      <li class="{{ message.tags }}">{{ message }}</li>
     {% endfor %}
-</html>
+  </ul>
+{% endif %}
+
+<div class="card p-4 mb-4 bg-white shadow-sm">
+  <h2 class="mb-3">Lorem Ipsum</h2>
+  <img src="{% static 'pizza.png' %}" class="img-fluid rounded mb-3 w-25 d-block mx-auto" alt="Pizza">
+  <div class="fs-5 lh-lg" style="text-align: justify;">
+    {{ article_text|linebreaks }}
+  </div>
+</div>
+
+<hr>
+<h1 class="mb-3">Nowy komentarz</h1>
+Piszesz jako: <b>{{ username }}</b>
+<form method="post" class="mb-3">
+{% csrf_token %}
+    <div class="mb-3">
+        {{ form.content.label_tag }}
+        {{ form.content }}
+    </div>
+    <button type="submit" class="btn btn-primary">Wyślij komentarz</button>
+</form>
+
+<hr>
+<h2 class="mb-3">Wszystkie komentarze:</h2>
+{% for comment in comments %}
+    <div class="mb-3 p-2 border rounded bg-white">
+        <strong>O {{ comment.created_at|date:"H:i:s" }} dnia {{ comment.created_at|date:"d-m-Y" }}, {{ comment.author }}</strong> napisał:
+        <p>{{ comment.content }}</p>
+    </div>
+{% empty %}
+    <p>Brak komentarzy</p>
+{% endfor %}
+
+{% endblock %}
