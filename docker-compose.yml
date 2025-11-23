@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14-alpine
+    # Zmienne środowiskowe MUSZĄ pasować do tych używanych w Twoim settings.py Django
+    environment:
+      POSTGRES_DB: myappdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: mysecretpassword
+    volumes:
+      # Zachowaj dane bazy, aby nie tracić ich przy restartach
+      - postgres_data:/var/lib/postgresql/data/
+    healthcheck: # ZAP potrzebuje tego, aby wiedzieć, że baza jest gotowa
+      test: ["CMD-SHELL", "pg_isready -U user -d myappdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    # Użyje Twojego Dockerfile do zbudowania obrazu
+    build: . 
+    # Nadpisujemy CMD, używając 'wait-for-it' lub podobnego mechanizmu,
+    # aby upewnić się, że migracja nastąpi dopiero po uruchomieniu DB.
+    # W tym przypadku opieramy się na "depends_on: service_healthy"
+    command: sh -c "python manage.py migrate && service nginx start && gunicorn --bind 0.0.0.0:8000 bsiaw.wsgi:application"
+    ports:
+      - "8000:8000"
+    environment:
+      # Zmienne środowiskowe, których Twoja aplikacja Django musi użyć
+      DATABASE_HOST: db # Nazwa serwisu bazy danych!
+      DATABASE_NAME: myappdb
+      DATABASE_USER: user
+      DATABASE_PASSWORD: mysecretpassword
+      DATABASE_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy # Uruchom dopiero po zdiagnozowaniu DB jako gotowej
+    networks:
+      - zapnet
+
+networks:
+  zapnet:
+    driver: bridge 
+
+volumes:
+  postgres_data:
