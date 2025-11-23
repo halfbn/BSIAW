@@ -39,6 +39,78 @@ jobs:
         else
           echo "✅ No CRITICAL vulnerabilities found."
         fi
+  dast-scan:
+    name: DAST Scan (OWASP ZAP)
+    runs-on: ubuntu-latest
+    needs: sast-scan
+    steps:
+    - uses: actions/checkout@v4
+    
+    # Krok 1: Instalacja Docker Compose
+    - name: Install Docker Compose
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y docker-compose
+    
+    # Krok 2: Budowa obrazu (jak wcześniej, ale teraz wykorzysta go Compose)
+    - name: Build Docker image (bsiaw-app)
+      run: docker build -t bsiaw-app .
+
+    # Krok 3: Uruchomienie aplikacji (web) i bazy danych (db)
+    - name: Run application and database using Compose
+      run: |
+        # Compose automatycznie stworzy sieć i uruchomi oba serwisy.
+        docker-compose -f docker-compose.yml up -d
+        echo "Waiting for app to perform migrations and start..."
+        # Czas oczekiwania jest wydłużony, by objąć start bazy, migracje i NginXa/Gunicorna
+        sleep 45 
+        echo "--- Container status (Compose) ---"
+        docker-compose ps
+        echo "--- Container logs (web) ---"
+        docker-compose logs web || true
+        
+    - name: Pull ZAP (Optional)
+      run: docker pull ghcr.io/zaproxy/zaproxy:stable
+      
+    # Krok 4: Utworzenie katalogu na raporty ZAP
+    - name: Create ZAP output directory
+      run: mkdir zap_output
+      
+    # Krok 5: Zmodyfikowany ZAP DAST scan
+    # ZAP jest w sieci 'zapnet' i łączy się z hostem 'web' (aplikacja).
+    # Raporty są zapisywane do /zap/output, który jest montowany z folderu zap_output na hoście,
+    # co minimalizuje błędy uprawnień (PermissionError).
+    - name: Run ZAP Baseline DAST scan
+      run: |
+        docker run \
+          --network zapnet \
+          -v "$(pwd)/zap_output":/zap/output \
+          ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t http://web:8000 \
+              -g /zap/output/gen.conf \
+              -x /zap/output/zap-report.xml \
+              -r /zap/output/zap-report.html \
+              -J /zap/output/zap-report.json \
+              -m 5
+              
+    # Krok 6: Zatrzymanie Compose i usunięcie kontenerów
+    - name: Stop Compose Services
+      if: always() # Ważne, aby wykonać ten krok nawet po błędzie
+      run: docker-compose down
+
+    # Krok 7: Upload DAST report
+    - name: Upload DAST report
+      uses: actions/upload-artifact@v4
+      with:
+        name: dast-report
+        path: |
+          zap_output/zap-report.xml
+          zap_output/zap-report.json
+          zap_output/zap-report.html
+
+    - name: DO NOT FAIL (testing)
+      run: echo "Skipping fail for DAST test"
   # =============================
   #  Build & Push to ECR
   # =============================
