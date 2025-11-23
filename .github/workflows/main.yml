@@ -1,65 +1,64 @@
-name: CI - SAST  + Build
+name: CI - SAST + Build
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
 
-  # =============================
-  #  SAST Scan
-  # =============================
-  sast-scan:
+  sast-semgrep:
     name: SAST Scan (Semgrep)
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install Semgrep
-      run: pip install semgrep jq
+      - name: Install Semgrep
+        run: pip install semgrep
 
-    - name: Run Semgrep SAST scan
-      run: |
-        semgrep scan --config=auto --json > semgrep-report.json
+      - name: Run Semgrep scan
+        run: semgrep scan --config=auto --json --output=semgrep-report.json
 
-    - name: Upload SAST report
-      uses: actions/upload-artifact@v4
-      with:
-        name: sast-report
-        path: semgrep-report.json
+      - name: Upload SAST report
+        uses: actions/upload-artifact@v3
+        with:
+          name: semgrep-report
+          path: semgrep-report.json
 
-    - name: DO NOT FAIL (testing)
-      run: echo "Skipping fail for SAST test"
+      - name: Fail on ERROR findings (treat as CRITICAL)
+        run: |
+          if grep -q '"severity":"ERROR"' semgrep-report.json; then
+            echo "CRITICAL/ERROR vulnerabilities found!"
+            exit 1
+          else
+            echo "No CRITICAL vulnerabilities found."
+          fi
 
-
-  # =============================
-  #  Build & Push to ECR
-  # =============================
   build-and-push:
     name: Build and Push to ECR
     runs-on: ubuntu-latest
-    needs: dast-scan
+    needs: sast-semgrep
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Check out code
+        uses: actions/checkout@v4
 
-    - name: Log in to Amazon ECR
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-    - name: Login to ECR
-      uses: aws-actions/amazon-ecr-login@v2
-      id: login-ecr
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Build, tag, and push image
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
-        IMAGE_TAG: latest
-      run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
