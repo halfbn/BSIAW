@@ -1,12 +1,55 @@
-name: CI - Build and Push Docker Image
+name: CI - SAST + Build and Push Docker Image
+
 on:
   push:
     branches: [ "main" ]
 
 jobs:
+  # =============================
+  #  SAST Scan
+  # =============================
+  sast-scan:
+    name: SAST Scan (Semgrep)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Semgrep
+      run: |
+        pip install semgrep jq
+
+    - name: Run Semgrep SAST scan
+      run: |
+        semgrep scan \
+          --config=auto \
+          --severity=CRITICAL \
+          --json > semgrep-report.json
+
+    - name: Upload SAST report
+      uses: actions/upload-artifact@v4
+      with:
+        name: sast-report
+        path: semgrep-report.json
+
+    - name: Fail pipeline if CRITICAL vulnerabilities found
+      run: |
+        COUNT=$(jq '.results | length' semgrep-report.json)
+        if [ "$COUNT" -gt 0 ]; then
+          echo "❌ CRITICAL vulnerabilities found: $COUNT"
+          exit 1
+        else
+          echo "✅ No CRITICAL vulnerabilities found."
+        fi
+
+  # =============================
+  #  Build & Push to ECR
+  # =============================
   build-and-push:
     name: Build and Push to ECR
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
+    needs: sast-scan    # <-- zależność: odpali się TYLKO jeśli SAST przejdzie
 
     steps:
     - name: Check out code
@@ -18,11 +61,12 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
+
     - name: Login to ECR
       uses: aws-actions/amazon-ecr-login@v2
       id: login-ecr
 
-    - name: Build, tag, and push image to Amazon ECR
+    - name: Build, tag, and push image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
