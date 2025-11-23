@@ -5,6 +5,56 @@ on:
     branches: [ "main" ]
 
 jobs:
+  dast-scan:
+    name: DAST Scan (OWASP ZAP)
+    runs-on: ubuntu-latest
+    needs: build-and-push   # skanujemy aplikację po zbudowaniu
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: docker build -t bsiaw-app .
+
+    - name: Run application container
+      run: |
+        docker run -d -p 8000:8000 --name bsiaw bsiaw-app
+        sleep 10  # czekamy aż aplikacja wstanie
+
+    - name: Install ZAP
+      run: docker pull ghcr.io/zaproxy/zaproxy:stable
+
+    - name: Run ZAP Baseline DAST scan
+      run: |
+        docker run --network="host" \
+          -v $(pwd):/zap/wrk \
+          ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://localhost:8000 \
+            -g gen.conf \
+            -x zap-report.xml \
+            -r zap-report.html \
+            -J zap-report.json \
+            -m 5
+
+    - name: Upload DAST report
+      uses: actions/upload-artifact@v4
+      with:
+        name: dast-report
+        path: |
+          zap-report.xml
+          zap-report.json
+          zap-report.html
+
+    - name: Fail on High Risk issues
+      run: |
+        if grep -q "FAIL-NEW:" zap-report.html; then
+          echo "❌ High-risk vulnerabilities found!"
+          exit 1
+        else
+          echo "✅ No high-risk vulnerabilities."
+        fi
+
   # =============================
   #  SAST Scan
   # =============================
