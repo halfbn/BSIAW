@@ -29,13 +29,12 @@ jobs:
         name: sast-report
         path: semgrep-report.json
 
-    # ❗ WYŁĄCZAMY FAIL NA BŁĘDY – do testów
     - name: DO NOT FAIL (testing)
       run: echo "Skipping fail for SAST test"
 
 
   # =============================
-  #  DAST Scan
+  #  DAST Scan (ZAP)
   # =============================
   dast-scan:
     name: DAST Scan (OWASP ZAP)
@@ -48,25 +47,44 @@ jobs:
     - name: Build Docker image
       run: docker build -t bsiaw-app .
 
+    # 👇👇👇 TO JEST TO CZEGO BRAKOWAŁO 👇👇👇
+    - name: Create Docker network
+      run: docker network create zapnet
+
     - name: Run application container
       run: |
-        docker run -d -p 8000:8000 --name bsiaw bsiaw-app
-        sleep 10
+        docker run -d \
+          --network zapnet \
+          --name bsiaw \
+          -p 8000:8000 \
+          bsiaw-app
 
-    - name: Install ZAP
+        echo "Waiting for app to start..."
+        sleep 20
+
+        echo "--- Container status ---"
+        docker ps -a
+
+        echo "--- Container logs ---"
+        docker logs bsiaw || true
+
+    - name: Pull ZAP
       run: docker pull ghcr.io/zaproxy/zaproxy:stable
 
+    # 👇 ZAP działa w tej samej sieci co aplikacja
     - name: Run ZAP Baseline DAST scan
       run: |
-        docker run --network="host" \
-          -v $(pwd):/zap/wrk \
-          ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-            -t http://localhost:8000 \
-            -g gen.conf \
-            -x zap-report.xml \
-            -r zap-report.html \
-            -J zap-report.json \
-            -m 5
+        docker run \
+          --network zapnet \
+          -v "$(pwd)":/zap/wrk \
+          ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t http://bsiaw:8000 \
+              -g gen.conf \
+              -x zap-report.xml \
+              -r zap-report.html \
+              -J zap-report.json \
+              -m 5
 
     - name: Upload DAST report
       uses: actions/upload-artifact@v4
@@ -77,13 +95,12 @@ jobs:
           zap-report.json
           zap-report.html
 
-    # ❗ WYŁĄCZAMY FAIL NA BŁĘDY – do testów
     - name: DO NOT FAIL (testing)
       run: echo "Skipping fail for DAST test"
 
 
   # =============================
-  #  Build & Push to ECR (na końcu)
+  #  Build & Push to ECR
   # =============================
   build-and-push:
     name: Build and Push to ECR
@@ -110,4 +127,5 @@ jobs:
         ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
         IMAGE_TAG: latest
       run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ._
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
