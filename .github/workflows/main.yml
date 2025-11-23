@@ -1,10 +1,11 @@
-name: CI - SAST + DAST + Build and Push Docker Image
+name: CI - SAST + DAST + Build
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
 
 jobs:
+
   # =============================
   #  SAST Scan
   # =============================
@@ -13,13 +14,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Install Semgrep
       run: pip install semgrep jq
 
-    - name: Run Semgrep scan
+    - name: Run Semgrep SAST scan
       run: |
         semgrep scan --config=auto --json > semgrep-report.json
 
@@ -29,25 +29,9 @@ jobs:
         name: sast-report
         path: semgrep-report.json
 
-    # ❗ WYŁĄCZAMY FAILOWANIE (żeby testować DAST)
-    - name: (TEMP) Do not fail on findings
-      run: echo "Skipping fail for now."
-
-
-  # =============================
-  #  Build Docker Image
-  # =============================
-  build-image:
-    name: Build Docker Image
-    runs-on: ubuntu-latest
-    needs: sast-scan   # <-- odpala się po SAST
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Build Docker image
-      run: docker build -t bsiaw-app .
+    # ❗ WYŁĄCZAMY FAIL NA BŁĘDY – do testów
+    - name: DO NOT FAIL (testing)
+      run: echo "Skipping fail for SAST test"
 
 
   # =============================
@@ -56,21 +40,23 @@ jobs:
   dast-scan:
     name: DAST Scan (OWASP ZAP)
     runs-on: ubuntu-latest
-    needs: build-image   # <-- działa po build
+    needs: sast-scan
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: docker build -t bsiaw-app .
 
     - name: Run application container
       run: |
         docker run -d -p 8000:8000 --name bsiaw bsiaw-app
         sleep 10
 
-    - name: Pull ZAP
+    - name: Install ZAP
       run: docker pull ghcr.io/zaproxy/zaproxy:stable
 
-    - name: Run ZAP Baseline Scan
+    - name: Run ZAP Baseline DAST scan
       run: |
         docker run --network="host" \
           -v $(pwd):/zap/wrk \
@@ -91,22 +77,21 @@ jobs:
           zap-report.json
           zap-report.html
 
-    # ❗ TEŻ WYŁĄCZAM FAILOWANIE, żeby testować
-    - name: (TEMP) Do not fail on DAST
-      run: echo "Skipping fail for now."
+    # ❗ WYŁĄCZAMY FAIL NA BŁĘDY – do testów
+    - name: DO NOT FAIL (testing)
+      run: echo "Skipping fail for DAST test"
 
 
   # =============================
-  #  Push do ECR
+  #  Build & Push to ECR (na końcu)
   # =============================
-  push-to-ecr:
-    name: Push to ECR
+  build-and-push:
+    name: Build and Push to ECR
     runs-on: ubuntu-latest
-    needs: dast-scan   # <-- działa dopiero po DAST
+    needs: dast-scan
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Log in to Amazon ECR
       uses: aws-actions/configure-aws-credentials@v4
@@ -119,11 +104,10 @@ jobs:
       uses: aws-actions/amazon-ecr-login@v2
       id: login-ecr
 
-    - name: Tag & Push image
+    - name: Build, tag, and push image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
         IMAGE_TAG: latest
       run: |
-        docker tag bsiaw-app $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ._
