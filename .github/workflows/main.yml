@@ -49,12 +49,13 @@ jobs:
         docker build -t $IMAGE_NAME:$IMAGE_TAG .
         echo "image=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Run container for DAST scan with database service
+    - name: Run container for DAST scan
       env:
         DB_USER: ${{ job.services.postgres.env.POSTGRES_USER }}
         DB_PASSWORD: ${{ job.services.postgres.env.POSTGRES_PASSWORD }}
         DB_NAME: ${{ job.services.postgres.env.POSTGRES_DB }}
       run: |
+        echo "Starting application container in background..."
         docker run -d --name my-app-for-scan \
           --network host \
           -e "DB_HOST=127.0.0.1" \
@@ -64,11 +65,14 @@ jobs:
           -e "DB_NAME=$DB_NAME" \
           ${{ steps.build-image.outputs.image }}
 
-        echo "Waiting for application to start..."
+        echo "Waiting for application to start (including migrations)..."
         sleep 20
         
-        echo "Checking if the application container is running..."
-        docker ps
+        echo "Checking container status..."
+        docker ps -a
+        
+        echo "Displaying application logs..."
+        docker logs my-app-for-scan
 
     - name: Run OWASP ZAP Baseline Scan
       run: |
