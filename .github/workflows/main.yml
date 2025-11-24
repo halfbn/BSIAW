@@ -3,7 +3,7 @@ name: CI - Dry Run Secure Pipeline Test
 # Uruchom ten workflow TYLKO na branchu testowym
 on:
   push:
-    branches: [ "feature/secure-pipeline-test" ]
+    branches: [ "test-ci-cd-sec" ]
 
 jobs:
   secure-pipeline-dry-run:
@@ -27,8 +27,7 @@ jobs:
     # =======================================================
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
-      with:
-        languages: 'go, javascript, python, ruby' # Możesz dostosować języki lub usunąć tę linię, aby CodeQL sam je wykrył
+# Możesz dostosować języki lub usunąć tę linię, aby CodeQL sam je wykrył
 
     - name: Autobuild
       uses: github/codeql-action/autobuild@v3
