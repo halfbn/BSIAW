@@ -55,7 +55,10 @@ jobs:
         IMAGE_TAG=${{ github.sha }}
         docker build -t $IMAGE_NAME:$IMAGE_TAG .
         echo "image=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
+        
+    - name: Próba naprawy metodą na pałę
+      run: sudo chmod -R 777 ${{ github.workspace }}
+      
     - name: Run container for DAST scan
       run: |
         echo "Starting application container in background..."
