@@ -2,7 +2,7 @@ name: CI - Dry Run Secure Pipeline Test
 
 on:
   push:
-    branches: [ "test-ci-cd-sec" ]
+    branches: [ "proba-ci/cd-jebac" ]
 
 jobs:
   secure-pipeline-dry-run:
