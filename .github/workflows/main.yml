@@ -10,24 +10,43 @@ jobs:
     name: Secure Pipeline Dry Run
     runs-on: ubuntu-latest
 
+    # =======================================================
+    #  KROK 0: DEFINICJA KONTENERA USŁUGI (BAZA DANYCH)
+    # =======================================================
+    services:
+      # Uruchamiamy kontener z bazą danych PostgreSQL, który będzie dostępny dla tego zadania
+      postgres:
+        image: postgres:13
+        # Ustawiamy zmienne środowiskowe dla tymczasowej bazy danych
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: testdb
+        # Opcje portu i sprawdzania stanu zdrowia
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     permissions:
-      # Wymagane do wysyłania wyników skanowania CodeQL do GitHub
       security-events: write
       contents: read
 
     steps:
     # =======================================================
-    #  KROK 1: POBRANIE KODU - bez zmian
+    #  KROK 1: POBRANIE KODU
     # =======================================================
     - name: Check out code
       uses: actions/checkout@v4
 
     # =======================================================
-    #  KROK 2: SKANOWANIE SAST (CODEQL) - bez zmian
+    #  KROK 2: SKANOWANIE SAST (CODEQL)
     # =======================================================
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
-# Możesz dostosować języki lub usunąć tę linię, aby CodeQL sam je wykrył
 
     - name: Autobuild
       uses: github/codeql-action/autobuild@v3
@@ -41,38 +60,38 @@ jobs:
     - name: Build Docker image locally
       id: build-image
       run: |
-        # Definiujemy zmyślone nazwy, bo nie łączymy się z ECR
         IMAGE_NAME="test-image-local"
         IMAGE_TAG=${{ github.sha }}
-        
-        # Budujemy obraz lokalnie na runnerze
         docker build -t $IMAGE_NAME:$IMAGE_TAG .
-        
-        # Przekazujemy nazwę lokalnego obrazu do kolejnych kroków
         echo "image=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
     
-    # === KROKI ZWIĄZANE Z AWS SĄ CELOWO POMINIĘTE/KOMENTOWANE ===
-    # - name: Configure AWS credentials
-    # - name: Login to Amazon ECR
-    # - name: Push image to Amazon ECR
-
     # =======================================================
-    #  KROK 4: SKANOWANIE DAST (OWASP ZAP) - bez zmian
+    #  KROK 4: SKANOWANIE DAST (OWASP ZAP)
     # =======================================================
-    - name: Run container for DAST scan
+    - name: Run container for DAST scan with database service
       run: |
-        # Uruchamiamy lokalnie zbudowany obraz w tle
-        docker run -d --name my-app-for-scan -p 8080:8080 ${{ steps.build-image.outputs.image }}
-        # Dajmy aplikacji chwilę na uruchomienie
-        sleep 15
+        # Uruchamiamy kontener, przekazując mu dane do tymczasowej bazy danych
+        docker run -d --name my-app-for-scan \
+          --network host \
+          -e "DB_HOST=127.0.0.1" \
+          -e "DB_PORT=5432" \
+          -e "DB_USER=${{ job.services.postgres.env.POSTGRES_USER }}" \
+          -e "DB_PASSWORD=${{ job.services.postgres.env.POSTGRES_PASSWORD }}" \
+          -e "DB_NAME=${{ job.services.postgres.env.POSTGRES_DB }}" \
+          -p 8080:80 \
+          ${{ steps.build-image.outputs.image }}
+
+        # Dajmy aplikacji chwilę na pełne uruchomienie i migracje
+        echo "Waiting for application to start..."
+        sleep 20
 
     - name: Run OWASP ZAP Baseline Scan
       run: |
+        # Używamy poprawnego, aktualnego obrazu ZAP
         docker run --rm -v $(pwd):/zap/wrk/:rw \
         --network="host" \
-        owasp/zap2docker-stable zap-baseline.py \
+        ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
         -t http://127.0.0.1:8080 -r report.html
-      # Kontynuuj nawet jeśli ZAP znajdzie błędy, aby raport został zapisany
       continue-on-error: true
 
     - name: Upload DAST Report
@@ -87,4 +106,3 @@ jobs:
     - name: Simulate signing the image
       run: |
         echo "✅ SYMULACJA: W tym kroku obraz ${{ steps.build-image.outputs.image }} zostałby podpisany."
-        echo "W prawdziwym pipeline, komenda 'cosign sign' zostałaby tutaj wykonana."
