@@ -1,6 +1,5 @@
 name: CI - Dry Run Secure Pipeline Test
 
-# Uruchom ten workflow TYLKO na branchu testowym
 on:
   push:
     branches: [ "test-ci-cd-sec" ]
@@ -10,19 +9,13 @@ jobs:
     name: Secure Pipeline Dry Run
     runs-on: ubuntu-latest
 
-    # =======================================================
-    #  KROK 0: DEFINICJA KONTENERA USŁUGI (BAZA DANYCH)
-    # =======================================================
     services:
-      # Uruchamiamy kontener z bazą danych PostgreSQL, który będzie dostępny dla tego zadania
       postgres:
         image: postgres:13
-        # Ustawiamy zmienne środowiskowe dla tymczasowej bazy danych
         env:
           POSTGRES_USER: testuser
           POSTGRES_PASSWORD: testpassword
           POSTGRES_DB: testdb
-        # Opcje portu i sprawdzania stanu zdrowia
         ports:
           - 5432:5432
         options: >-
@@ -36,15 +29,9 @@ jobs:
       contents: read
 
     steps:
-    # =======================================================
-    #  KROK 1: POBRANIE KODU
-    # =======================================================
     - name: Check out code
       uses: actions/checkout@v4
 
-    # =======================================================
-    #  KROK 2: SKANOWANIE SAST (CODEQL)
-    # =======================================================
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
 
@@ -54,9 +41,6 @@ jobs:
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
 
-    # =======================================================
-    #  KROK 3: SYMULACJA BUDOWANIA OBRAZU DOCKER
-    # =======================================================
     - name: Build Docker image locally
       id: build-image
       run: |
@@ -64,34 +48,34 @@ jobs:
         IMAGE_TAG=${{ github.sha }}
         docker build -t $IMAGE_NAME:$IMAGE_TAG .
         echo "image=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
-    
-    # =======================================================
-    #  KROK 4: SKANOWANIE DAST (OWASP ZAP)
-    # =======================================================
+
     - name: Run container for DAST scan with database service
+      env:
+        DB_USER: ${{ job.services.postgres.env.POSTGRES_USER }}
+        DB_PASSWORD: ${{ job.services.postgres.env.POSTGRES_PASSWORD }}
+        DB_NAME: ${{ job.services.postgres.env.POSTGRES_DB }}
       run: |
-        # Uruchamiamy kontener, przekazując mu dane do tymczasowej bazy danych
         docker run -d --name my-app-for-scan \
           --network host \
           -e "DB_HOST=127.0.0.1" \
           -e "DB_PORT=5432" \
-          -e "DB_USER=${{ job.services.postgres.env.POSTGRES_USER }}" \
-          -e "DB_PASSWORD=${{ job.services.postgres.env.POSTGRES_PASSWORD }}" \
-          -e "DB_NAME=${{ job.services.postgres.env.POSTGRES_DB }}" \
-          -p 8080:80 \
+          -e "DB_USER=$DB_USER" \
+          -e "DB_PASSWORD=$DB_PASSWORD" \
+          -e "DB_NAME=$DB_NAME" \
           ${{ steps.build-image.outputs.image }}
 
-        # Dajmy aplikacji chwilę na pełne uruchomienie i migracje
         echo "Waiting for application to start..."
         sleep 20
+        
+        echo "Checking if the application container is running..."
+        docker ps
 
     - name: Run OWASP ZAP Baseline Scan
       run: |
-        # Używamy poprawnego, aktualnego obrazu ZAP
         docker run --rm -v $(pwd):/zap/wrk/:rw \
         --network="host" \
         ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-        -t http://127.0.0.1:8080 -r report.html
+        -t http://127.0.0.1:80 -r report.html
       continue-on-error: true
 
     - name: Upload DAST Report
@@ -100,9 +84,6 @@ jobs:
         name: dast-zap-report
         path: report.html
 
-    # =======================================================
-    #  KROK 5: SYMULACJA PODPISYWANIA (COSIGN)
-    # =======================================================
     - name: Simulate signing the image
       run: |
         echo "✅ SYMULACJA: W tym kroku obraz ${{ steps.build-image.outputs.image }} zostałby podpisany."
