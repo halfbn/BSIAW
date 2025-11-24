@@ -9,13 +9,20 @@ jobs:
     name: Secure Pipeline Dry Run
     runs-on: ubuntu-latest
 
+    # Definiujemy zmienne dla całego zadania w jednym miejscu
+    env:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: testdb
+
     services:
       postgres:
         image: postgres:13
+        # Używamy zmiennych zdefiniowanych na poziomie zadania
         env:
-          POSTGRES_USER: testuser
-          POSTGRES_PASSWORD: testpassword
-          POSTGRES_DB: testdb
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
           - 5432:5432
         options: >-
@@ -50,19 +57,16 @@ jobs:
         echo "image=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
     - name: Run container for DAST scan
-      env:
-        DB_USER: ${{ job.services.postgres.env.POSTGRES_USER }}
-        DB_PASSWORD: ${{ job.services.postgres.env.POSTGRES_PASSWORD }}
-        DB_NAME: ${{ job.services.postgres.env.POSTGRES_DB }}
       run: |
         echo "Starting application container in background..."
+        # Przekazujemy zmienne z poziomu zadania bezpośrednio do kontenera
         docker run -d --name my-app-for-scan \
           --network host \
           -e "DB_HOST=127.0.0.1" \
           -e "DB_PORT=5432" \
-          -e "DB_USER=$DB_USER" \
-          -e "DB_PASSWORD=$DB_PASSWORD" \
-          -e "DB_NAME=$DB_NAME" \
+          -e "DB_USER=${{ env.POSTGRES_USER }}" \
+          -e "DB_PASSWORD=${{ env.POSTGRES_PASSWORD }}" \
+          -e "DB_NAME=${{ env.POSTGRES_DB }}" \
           ${{ steps.build-image.outputs.image }}
 
         echo "Waiting for application to start (including migrations)..."
