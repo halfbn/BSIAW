@@ -17,7 +17,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:13
+        image: postgres:14
         # Używamy zmiennych zdefiniowanych na poziomie zadania
         env:
           POSTGRES_USER: ${{ env.POSTGRES_USER }}
