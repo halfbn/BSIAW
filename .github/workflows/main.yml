@@ -1,72 +1,91 @@
-name: CI - SAST + Build and Push Docker Image
+name: CI - Dry Run Secure Pipeline Test
 
+# Uruchom ten workflow TYLKO na branchu testowym
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "feature/secure-pipeline-test" ]
 
 jobs:
-  # =============================
-  #  SAST Scan
-  # =============================
-  sast-scan:
-    name: SAST Scan (Semgrep)
+  secure-pipeline-dry-run:
+    name: Secure Pipeline Dry Run
     runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Install Semgrep
-      run: pip install semgrep jq
-
-    - name: Run Semgrep SAST scan
-      run: |
-        semgrep scan \
-          --config=auto \
-          --json > semgrep-report.json
-    - name: Upload SAST report
-      uses: actions/upload-artifact@v4
-      with:
-        name: sast-report
-        path: semgrep-report.json
-
-    - name: Fail pipeline if CRITICAL/ERROR vulnerabilities found
-      run: |
-        COUNT=$(jq '[.results[] | select(.extra.severity == "ERROR")] | length' semgrep-report.json)
-        if [ "$COUNT" -gt 0 ]; then
-          echo "❌ CRITICAL/ERROR vulnerabilities found: $COUNT"
-          exit 1
-        else
-          echo "✅ No CRITICAL vulnerabilities found."
-        fi
-  # =============================
-  #  Build & Push to ECR
-  # =============================
-  build-and-push:
-    name: Build and Push to ECR
-    runs-on: ubuntu-latest
-    needs: sast-scan    # <-- odpali się TYLKO jeśli SAST przejdzie
+    permissions:
+      # Wymagane do wysyłania wyników skanowania CodeQL do GitHub
+      security-events: write
+      contents: read
 
     steps:
+    # =======================================================
+    #  KROK 1: POBRANIE KODU - bez zmian
+    # =======================================================
     - name: Check out code
       uses: actions/checkout@v4
 
-    - name: Log in to Amazon ECR
-      uses: aws-actions/configure-aws-credentials@v4
+    # =======================================================
+    #  KROK 2: SKANOWANIE SAST (CODEQL) - bez zmian
+    # =======================================================
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        languages: 'go, javascript, python, ruby' # Możesz dostosować języki lub usunąć tę linię, aby CodeQL sam je wykrył
 
-    - name: Login to ECR
-      uses: aws-actions/amazon-ecr-login@v2
-      id: login-ecr
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
 
-    - name: Build, tag, and push image
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
-        IMAGE_TAG: latest
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+
+    # =======================================================
+    #  KROK 3: SYMULACJA BUDOWANIA OBRAZU DOCKER
+    # =======================================================
+    - name: Build Docker image locally
+      id: build-image
       run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        # Definiujemy zmyślone nazwy, bo nie łączymy się z ECR
+        IMAGE_NAME="test-image-local"
+        IMAGE_TAG=${{ github.sha }}
+        
+        # Budujemy obraz lokalnie na runnerze
+        docker build -t $IMAGE_NAME:$IMAGE_TAG .
+        
+        # Przekazujemy nazwę lokalnego obrazu do kolejnych kroków
+        echo "image=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
+    
+    # === KROKI ZWIĄZANE Z AWS SĄ CELOWO POMINIĘTE/KOMENTOWANE ===
+    # - name: Configure AWS credentials
+    # - name: Login to Amazon ECR
+    # - name: Push image to Amazon ECR
+
+    # =======================================================
+    #  KROK 4: SKANOWANIE DAST (OWASP ZAP) - bez zmian
+    # =======================================================
+    - name: Run container for DAST scan
+      run: |
+        # Uruchamiamy lokalnie zbudowany obraz w tle
+        docker run -d --name my-app-for-scan -p 8080:8080 ${{ steps.build-image.outputs.image }}
+        # Dajmy aplikacji chwilę na uruchomienie
+        sleep 15
+
+    - name: Run OWASP ZAP Baseline Scan
+      run: |
+        docker run --rm -v $(pwd):/zap/wrk/:rw \
+        --network="host" \
+        owasp/zap2docker-stable zap-baseline.py \
+        -t http://127.0.0.1:8080 -r report.html
+      # Kontynuuj nawet jeśli ZAP znajdzie błędy, aby raport został zapisany
+      continue-on-error: true
+
+    - name: Upload DAST Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: dast-zap-report
+        path: report.html
+
+    # =======================================================
+    #  KROK 5: SYMULACJA PODPISYWANIA (COSIGN)
+    # =======================================================
+    - name: Simulate signing the image
+      run: |
+        echo "✅ SYMULACJA: W tym kroku obraz ${{ steps.build-image.outputs.image }} zostałby podpisany."
+        echo "W prawdziwym pipeline, komenda 'cosign sign' zostałaby tutaj wykonana."
