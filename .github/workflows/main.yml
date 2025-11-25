@@ -1,21 +1,21 @@
-name: CI - Secure Pipeline (ECR Test Tag)
+name: CI - Secure Pipeline (Correct Flow)
 
 on:
   push:
     branches: [ "ci-cd-sec-prez" ]
 
 jobs:
-  secure-pipeline-ecr-test:
-    name: Build, Scan & Push (Test)
+  secure-pipeline-verify-and-push:
+    name: Build -> Scan -> Push
     runs-on: ubuntu-latest
 
-    # Zmienne dla bazy danych (nadal hardcoded na potrzeby testu)
     env:
       POSTGRES_USER: testuser
       POSTGRES_PASSWORD: testpassword
       POSTGRES_DB: testdb
+      # Nazwa tymczasowa dla lokalnego obrazu
+      LOCAL_IMAGE_NAME: local-test-app
 
-    # Usługa bazy danych (wymagana do działania aplikacji podczas testów DAST)
     services:
       postgres:
         image: postgres:14
@@ -39,7 +39,8 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
 
-    # --- SEKCJA SAST (CodeQL) ---
+    # 1. ANALIZA STATYCZNA (SAST)
+    # Wykonywana na kodzie źródłowym przed budową
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
 
@@ -49,46 +50,19 @@ jobs:
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
 
-    # --- SEKCJA AWS (Logowanie) ---
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
-
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
-
-    # --- SEKCJA BUILD & PUSH (ECR) ---
-    - name: Build, tag, and push image to Amazon ECR
-      id: build-image
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
-        # Ustawiamy sztywny tag "test" zgodnie z życzeniem
-        IMAGE_TAG: test
+    # 2. BUDOWA OBRAZU (Lokalnie)
+    # Nie logujemy się jeszcze do AWS, nie wypychamy nic.
+    - name: Build Docker image locally
       run: |
-        FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-        
-        echo "Building image: $FULL_IMAGE"
-        docker build -t $FULL_IMAGE .
-        
-        echo "Pushing image to ECR..."
-        docker push $FULL_IMAGE
-        
-        # Zapisujemy nazwę obrazu do zmiennej wyjściowej, aby użyć jej w kroku DAST
-        echo "image=$FULL_IMAGE" >> $GITHUB_OUTPUT
+        docker build -t ${{ env.LOCAL_IMAGE_NAME }}:latest .
 
-    # --- PRZYGOTOWANIE DO DAST ---
-    - name: Fix permissions (Workaround)
+    - name: Fix permissions for DAST volume
       run: sudo chmod -R 777 ${{ github.workspace }}
-      
+
+    # 3. URUCHOMIENIE APLIKACJI DO TESTÓW
     - name: Run container for DAST scan
       run: |
-        echo "Starting application container from ECR image..."
-        # Używamy obrazu zbudowanego i otagowanego dla ECR
+        echo "Starting application locally..."
         docker run -d --name my-app-for-scan \
           --network host \
           -e "DB_HOST=127.0.0.1" \
@@ -96,15 +70,14 @@ jobs:
           -e "DB_USER=${{ env.POSTGRES_USER }}" \
           -e "DB_PASSWORD=${{ env.POSTGRES_PASSWORD }}" \
           -e "DB_NAME=${{ env.POSTGRES_DB }}" \
-          ${{ steps.build-image.outputs.image }}
+          ${{ env.LOCAL_IMAGE_NAME }}:latest
 
-        echo "Waiting for application to start..."
+        echo "Waiting for start..."
         sleep 20
-        
-        echo "Checking container logs:"
         docker logs my-app-for-scan
 
-    # --- SEKCJA DAST (OWASP ZAP) ---
+    # 4. ANALIZA DYNAMICZNA (DAST) - BRAMKA BEZPIECZEŃSTWA
+    # Jeśli tu wystąpi błąd (bez flagi -I lub continue-on-error), pipeline się zatrzyma.
     - name: Run OWASP ZAP Baseline Scan
       run: |
         docker run --rm -v $(pwd):/zap/wrk/:rw \
@@ -118,8 +91,29 @@ jobs:
         name: dast-zap-report
         path: report.html
 
-    # --- SEKCJA FINALNA ---
-    - name: Pipeline Summary
+    # 5. PUBLIKACJA (PUSH TO ECR)
+    # Ten kod wykona się TYLKO jeśli poprzednie kroki (SAST i DAST) zakończyły się sukcesem.
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Tag and Push image to ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
+        IMAGE_TAG: test
       run: |
-        echo "✅ Obraz został przeskanowany (SAST/DAST) i wypchnięty do ECR z tagiem 'test'."
-        echo "🖼️ Obraz: ${{ steps.build-image.outputs.image }}"
+        # Tagujemy lokalny obraz adresem rejestru AWS
+        docker tag ${{ env.LOCAL_IMAGE_NAME }}:test2 $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        
+        echo "Pushing image to ECR..."
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        
+        echo "✅ SUCCESS: Image pushed to ECR only after passing security checks."
