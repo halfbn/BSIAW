@@ -1,24 +1,24 @@
-name: CI - Dry Run Secure Pipeline Test
+name: CI - Secure Pipeline (ECR Test Tag)
 
 on:
   push:
     branches: [ "ci-cd-sec-prez" ]
 
 jobs:
-  secure-pipeline-dry-run:
-    name: Secure Pipeline Dry Run
+  secure-pipeline-ecr-test:
+    name: Build, Scan & Push (Test)
     runs-on: ubuntu-latest
 
-    # Definiujemy zmienne dla całego zadania w jednym miejscu
+    # Zmienne dla bazy danych (nadal hardcoded na potrzeby testu)
     env:
       POSTGRES_USER: testuser
       POSTGRES_PASSWORD: testpassword
       POSTGRES_DB: testdb
 
+    # Usługa bazy danych (wymagana do działania aplikacji podczas testów DAST)
     services:
       postgres:
         image: postgres:14
-        # Używamy zmiennych zdefiniowanych na poziomie zadania
         env:
           POSTGRES_USER: ${{ env.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
@@ -39,6 +39,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
 
+    # --- SEKCJA SAST (CodeQL) ---
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
 
@@ -48,21 +49,46 @@ jobs:
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
 
-    - name: Build Docker image locally
+    # --- SEKCJA AWS (Logowanie) ---
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # --- SEKCJA BUILD & PUSH (ECR) ---
+    - name: Build, tag, and push image to Amazon ECR
       id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
+        # Ustawiamy sztywny tag "test" zgodnie z życzeniem
+        IMAGE_TAG: test
       run: |
-        IMAGE_NAME="test-image-local"
-        IMAGE_TAG=${{ github.sha }}
-        docker build -t $IMAGE_NAME:$IMAGE_TAG .
-        echo "image=$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
+        FULL_IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
         
-    - name: Próba naprawy metodą na pałę
+        echo "Building image: $FULL_IMAGE"
+        docker build -t $FULL_IMAGE .
+        
+        echo "Pushing image to ECR..."
+        docker push $FULL_IMAGE
+        
+        # Zapisujemy nazwę obrazu do zmiennej wyjściowej, aby użyć jej w kroku DAST
+        echo "image=$FULL_IMAGE" >> $GITHUB_OUTPUT
+
+    # --- PRZYGOTOWANIE DO DAST ---
+    - name: Fix permissions (Workaround)
       run: sudo chmod -R 777 ${{ github.workspace }}
       
     - name: Run container for DAST scan
       run: |
-        echo "Starting application container in background..."
-        # Przekazujemy zmienne z poziomu zadania bezpośrednio do kontenera
+        echo "Starting application container from ECR image..."
+        # Używamy obrazu zbudowanego i otagowanego dla ECR
         docker run -d --name my-app-for-scan \
           --network host \
           -e "DB_HOST=127.0.0.1" \
@@ -72,15 +98,13 @@ jobs:
           -e "DB_NAME=${{ env.POSTGRES_DB }}" \
           ${{ steps.build-image.outputs.image }}
 
-        echo "Waiting for application to start (including migrations)..."
+        echo "Waiting for application to start..."
         sleep 20
         
-        echo "Checking container status..."
-        docker ps -a
-        
-        echo "Displaying application logs..."
+        echo "Checking container logs:"
         docker logs my-app-for-scan
 
+    # --- SEKCJA DAST (OWASP ZAP) ---
     - name: Run OWASP ZAP Baseline Scan
       run: |
         docker run --rm -v $(pwd):/zap/wrk/:rw \
@@ -94,6 +118,8 @@ jobs:
         name: dast-zap-report
         path: report.html
 
-    - name: Simulate signing the image
+    # --- SEKCJA FINALNA ---
+    - name: Pipeline Summary
       run: |
-        echo "✅ SYMULACJA: W tym kroku obraz ${{ steps.build-image.outputs.image }} zostałby podpisany."
+        echo "✅ Obraz został przeskanowany (SAST/DAST) i wypchnięty do ECR z tagiem 'test'."
+        echo "🖼️ Obraz: ${{ steps.build-image.outputs.image }}"
