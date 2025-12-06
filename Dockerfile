@@ -14,8 +14,7 @@ COPY static/pizza.png static/pizza.png
 RUN pip install -r requirements.txt
 
 COPY nginx.conf /etc/nginx/nginx.conf
-
-# Tworzenie usera
+RUN python manage.py collectstatic --noinput
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 
 RUN touch /tmp/nginx.pid && chown appuser:appgroup /tmp/nginx.pid
@@ -28,3 +27,4 @@ USER appuser
 EXPOSE 8080
 
 CMD python manage.py migrate && nginx && gunicorn --bind 0.0.0.0:8000 bsiaw.wsgi:application
+
