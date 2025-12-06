@@ -76,7 +76,7 @@ jobs:
         docker run --rm -v $(pwd):/zap/wrk/:rw \
         --network="host" \
         ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-        -t http://127.0.0.1:80 -r report.html -I
+        -t http://127.0.0.1:8080 -r report.html -I
 
     - name: Upload DAST Report
       uses: actions/upload-artifact@v4
