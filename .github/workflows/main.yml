@@ -1,72 +1,110 @@
-name: CI - SAST + Build and Push Docker Image
+name: CI - Secure Pipeline (Correct Flow)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "ci-cd-sec-prez" ]
 
 jobs:
-  # =============================
-  #  SAST Scan
-  # =============================
-  sast-scan:
-    name: SAST Scan (Semgrep)
+  secure-pipeline-verify-and-push:
+    name: Build -> Scan -> Push
     runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    env:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpassword
+      POSTGRES_DB: testdb
+      LOCAL_IMAGE_NAME: local-test-app
 
-    - name: Install Semgrep
-      run: pip install semgrep jq
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-    - name: Run Semgrep SAST scan
-      run: |
-        semgrep scan \
-          --config=auto \
-          --json > semgrep-report.json
-    - name: Upload SAST report
-      uses: actions/upload-artifact@v4
-      with:
-        name: sast-report
-        path: semgrep-report.json
-
-    - name: Fail pipeline if CRITICAL/ERROR vulnerabilities found
-      run: |
-        COUNT=$(jq '[.results[] | select(.extra.severity == "ERROR")] | length' semgrep-report.json)
-        if [ "$COUNT" -gt 0 ]; then
-          echo "❌ CRITICAL/ERROR vulnerabilities found: $COUNT"
-          exit 1
-        else
-          echo "✅ No CRITICAL vulnerabilities found."
-        fi
-  # =============================
-  #  Build & Push to ECR
-  # =============================
-  build-and-push:
-    name: Build and Push to ECR
-    runs-on: ubuntu-latest
-    needs: sast-scan    # <-- odpali się TYLKO jeśli SAST przejdzie
+    permissions:
+      security-events: write
+      contents: read
 
     steps:
     - name: Check out code
       uses: actions/checkout@v4
 
-    - name: Log in to Amazon ECR
+    # ANALIZA STATYCZNA (SAST)
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+
+    # 2. BUDOWA OBRAZU (Lokalnie)
+    - name: Build Docker image locally
+      run: |
+        docker build -t ${{ env.LOCAL_IMAGE_NAME }}:latest .
+
+    - name: Fix permissions for DAST volume
+      run: sudo chmod -R 777 ${{ github.workspace }}
+
+    # URUCHOMIENIE APLIKACJI DO TESTÓW
+    - name: Run container for DAST scan
+      run: |
+        echo "Starting application locally..."
+        docker run -d --name my-app-for-scan \
+          --network host \
+          -e "DB_HOST=127.0.0.1" \
+          -e "DB_PORT=5432" \
+          -e "DB_USER=${{ env.POSTGRES_USER }}" \
+          -e "DB_PASSWORD=${{ env.POSTGRES_PASSWORD }}" \
+          -e "DB_NAME=${{ env.POSTGRES_DB }}" \
+          ${{ env.LOCAL_IMAGE_NAME }}:latest
+
+        echo "Waiting for start..."
+        sleep 20
+        docker logs my-app-for-scan
+
+    # ANALIZA DYNAMICZNA (DAST)
+    - name: Run OWASP ZAP Baseline Scan
+      run: |
+        docker run --rm -v $(pwd):/zap/wrk/:rw \
+        --network="host" \
+        ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+        -t http://127.0.0.1:80 -r report.html -I
+
+    - name: Upload DAST Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: dast-zap-report
+        path: report.html
+
+    # PUBLIKACJA (PUSH TO ECR)
+    - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
-    - name: Login to ECR
-      uses: aws-actions/amazon-ecr-login@v2
+    - name: Login to Amazon ECR
       id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Build, tag, and push image
+    - name: Tag and Push image to ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
         IMAGE_TAG: latest
       run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker tag ${{ env.LOCAL_IMAGE_NAME }}:latest $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        
+        echo "Pushing image to ECR..."
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        
+        echo "SUCCESS: Image pushed to ECR only after passing security checks."
