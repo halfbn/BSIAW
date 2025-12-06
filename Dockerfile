@@ -11,10 +11,11 @@ COPY static/pizza.png static/pizza.png
 RUN pip install -r requirements.txt
 
 COPY nginx.conf /etc/nginx/sites-available/default
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+RUN chown -R appuser:appgroup /bsiaw
 USER appuser
 CMD python manage.py migrate && service nginx start && gunicorn --bind 0.0.0.0:8000 bsiaw.wsgi:application
+
 
 
 
