@@ -41,13 +41,15 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 #   'bsiaw',
     'blog123',
-    'bsiaw.apps.Blogconf'
+    'bsiaw.apps.Blogconf',
+    'corsheaders' #cors dodanie
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',#naglowki cors
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'axes.middleware.AxesMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -160,12 +162,54 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = 'protected'
 LOGOUT_REDIRECT_URL = 'index'
 
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = True  # True w HTTPS
-SESSION_COOKIE_SAMESITE = 'Lax'
+# COOKIE & HTTPS SECURITY -michal lab 7 1f
 
-CSRF_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SECURE = True
+# TRYB LOKALNY (DEVELOPMENT)
+if os.environ.get("DJANGO_ENV") == "LOCAL":
+    SESSION_COOKIE_AGE = 10 #wygasanie sesji po 10 sekundach
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+    # Brak HTTPS → Secure wyłączone
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+
+    # HttpOnly dalej włączone
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+
+    # SameSite=Lax — działa na HTTP
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
+
+    # Brak przekierowania do HTTPS
+    SECURE_SSL_REDIRECT = False
+    SECURE_PROXY_SSL_HEADER = None
+
+
+# Kiedy https
+else:
+    SESSION_COOKIE_AGE = 10 #wygasanie sesji po 10 sekundach
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+    # --- Secure + HttpOnly ---
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+
+    # --- SameSite=strict ---
+    SESSION_COOKIE_SAMESITE = 'Strict'
+    CSRF_COOKIE_SAMESITE = 'Strict'
+
+    # --- Wymuszenie HTTPS ---
+    SECURE_SSL_REDIRECT = True
+
+    # Poprawne wykrywanie HTTPS za Nginxem
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
 
 LOGGING = {
     "version": 1,
@@ -183,3 +227,10 @@ LOGGING = {
         },
     },
 }
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://localhost:3000"# frontend lokalny dodac inna nazwe domeny jeszcze jak sie bedzie testowalo
+]
+
+CORS_ALLOW_CREDENTIALS = True #pozwala wysylac i odbierac cookies 

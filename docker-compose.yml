@@ -28,6 +28,7 @@ services:
       - "8000:8000"
     environment:
       # Zmienne środowiskowe, których Twoja aplikacja Django musi użyć
+      DJANGO_ENV: LOCAL #jesli nie testujemy lokalnie zmienic
       DATABASE_HOST: db # Nazwa serwisu bazy danych!
       DATABASE_NAME: myappdb
       DATABASE_USER: user
