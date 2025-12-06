@@ -2,7 +2,7 @@ name: CI - Secure Pipeline (Correct Flow)
 
 on:
   push:
-    branches: [ "ci-cd-sec-prez" ]
+    branches: [ "main" ]
 
 jobs:
   secure-pipeline-verify-and-push:
