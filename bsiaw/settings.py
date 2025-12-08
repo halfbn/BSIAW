@@ -39,15 +39,16 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-#   'bsiaw',
-    'blog123',
-    'bsiaw.apps.Blogconf'
+    'bsiaw',
+    'blog123.apps.Blogconf',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',#naglowki cors
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'axes.middleware.AxesMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -148,7 +149,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+#STATIC_ROOT = '/static/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -159,13 +161,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = 'protected'
 LOGOUT_REDIRECT_URL = 'index'
-
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = True  # True w HTTPS
-SESSION_COOKIE_SAMESITE = 'Lax'
-
-CSRF_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SECURE = True
 
 LOGGING = {
     "version": 1,
@@ -183,3 +178,56 @@ LOGGING = {
         },
     },
 }
+# COOKIE & HTTPS SECURITY -michal lab 7 1f
+# TRYB LOKALNY (DEVELOPMENT)
+if os.environ.get("DJANGO_ENV") == "LOCAL":
+    SESSION_COOKIE_AGE = 30 #wygasanie sesji po 30 sekundach
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+    # Brak HTTPS → Secure wyłączone
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+
+    # HttpOnly dalej włączone
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+
+    # SameSite=Lax — działa na HTTP
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
+
+    # Brak przekierowania do HTTPS
+    SECURE_SSL_REDIRECT = False
+    SECURE_PROXY_SSL_HEADER = None
+
+
+# Kiedy https
+else:
+    SESSION_COOKIE_AGE = 30 #wygasanie sesji po 30 sekundach
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+    # --- Secure + HttpOnly ---
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+
+    # --- SameSite=strict ---
+    SESSION_COOKIE_SAMESITE = 'Strict'
+    CSRF_COOKIE_SAMESITE = 'Strict'
+
+    # --- Wymuszenie HTTPS ---
+    SECURE_SSL_REDIRECT = True
+
+    # Poprawne wykrywanie HTTPS za Nginxem
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://localhost:3000"# frontend lokalny dodac inna nazwe domeny jeszcze jak sie bedzie testowalo
+]
+
+CORS_ALLOW_CREDENTIALS = True #pozwala wysylac i odbierac cookies 

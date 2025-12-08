@@ -2,7 +2,7 @@ name: CI - Secure Pipeline (Correct Flow)
 
 on:
   push:
-    branches: [ "ci-cd-sec-prez" ]
+    branches: [ "main" ]
 
 jobs:
   secure-pipeline-verify-and-push:
@@ -59,6 +59,7 @@ jobs:
         echo "Starting application locally..."
         docker run -d --name my-app-for-scan \
           --network host \
+          -e "DJANGO_ENV=LOCAL" \
           -e "DB_HOST=127.0.0.1" \
           -e "DB_PORT=5432" \
           -e "DB_USER=${{ env.POSTGRES_USER }}" \
@@ -76,7 +77,7 @@ jobs:
         docker run --rm -v $(pwd):/zap/wrk/:rw \
         --network="host" \
         ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
-        -t http://127.0.0.1:80 -r report.html -I
+        -t http://127.0.0.1:8080 -r report.html -I
 
     - name: Upload DAST Report
       uses: actions/upload-artifact@v4

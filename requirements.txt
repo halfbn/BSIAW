@@ -5,3 +5,4 @@ gunicorn
 psycopg2-binary
 argon2-cffi
 django-axes
+django-cors-headers
