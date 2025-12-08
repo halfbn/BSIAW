@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-)w!@3h3kxv18+atpf%*r85n(b5^8*45^)sihr(^8e=82!l_*t&'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
@@ -32,6 +32,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
+    'axes',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'bsiaw',
-    'blog123',
+    'blog123.apps.Blogconf',
     'corsheaders',
 ]
 
@@ -49,6 +50,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'axes.middleware.AxesMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -71,20 +73,40 @@ TEMPLATES = [
     },
 ]
 
+#Ustawienia django-axes
+AXES_ENABLED = True
+AXES_FAILURE_LIMIT = 10
+AXES_COOLOFF_TIME = 0.16
+AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True
+AXES_LOCKOUT_TEMPLATE = 'blokada.html'
+AXES_SENSITIVE_PARAMETERS = [] #  domyślnie [“username”, “ip_address”]
+
 WSGI_APPLICATION = 'bsiaw.wsgi.application'
 
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME'),
-        'USER': os.environ.get('DB_USER'),
-        'PASSWORD': os.environ.get('DB_PASSWORD'),
-        'HOST': os.environ.get('DB_HOST'),
-        'PORT': '5432',
+if os.environ.get("DJANGO_ENV") == "LOCAL":
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME'),
+            'USER': os.environ.get('DB_USER'),
+            'PASSWORD': os.environ.get('DB_PASSWORD'),
+            'HOST': os.environ.get('DB_HOST'),
+            'PORT': '5432',
     }
 }
 
@@ -98,6 +120,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "OPTIONS": {
+            "min_length": 14,
+            }
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -137,7 +162,22 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = 'protected'
 LOGOUT_REDIRECT_URL = 'index'
 
-
+LOGGING = {
+    "version": 1,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "loggers": {
+        "auth": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+        "axes.watch_login_failure": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+    },
+}
 # COOKIE & HTTPS SECURITY -michal lab 7 1f
 # TRYB LOKALNY (DEVELOPMENT)
 if os.environ.get("DJANGO_ENV") == "LOCAL":

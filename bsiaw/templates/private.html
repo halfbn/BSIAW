@@ -2,6 +2,13 @@
 {% block title %}Strona dla zalogowanych{% endblock %}
 {% block content %}
 <h1 class="mb-3">Strona dla zalogowanych</h1>
+{% if messages %}
+    <ul class="alert alert-info">
+    {% for message in messages %}
+        <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+{% endif %}
 <a href="/logout/" class="btn btn-danger">Wyloguj</a>
 <a href="/" class="btn btn-link">Powrót</a>
 {% endblock %}
