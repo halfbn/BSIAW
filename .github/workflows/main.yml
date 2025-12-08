@@ -59,6 +59,7 @@ jobs:
         echo "Starting application locally..."
         docker run -d --name my-app-for-scan \
           --network host \
+          -e "DJANGO_ENV=LOCAL" \
           -e "DB_HOST=127.0.0.1" \
           -e "DB_PORT=5432" \
           -e "DB_USER=${{ env.POSTGRES_USER }}" \
