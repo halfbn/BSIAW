@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 COPY nginx.conf /etc/nginx/nginx.conf
 
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+RUN groupadd -g 1000 appgroup && useradd -u 1000 -r -g appgroup -s /sbin/nologin appuser
 
 RUN chown -R root:root /etc/nginx && chmod -R 755 /etc/nginx
 
@@ -38,3 +38,4 @@ CMD ["sh", "-c", "\
     gunicorn --bind 0.0.0.0:8000 bsiaw.wsgi:application & \
     nginx -g 'daemon off;' \
 "]
+
