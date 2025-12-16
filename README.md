@@ -1,4 +1,4 @@
-# Bezpieczeństwo Serwerów i Aplikacji Webowych - Laboratorium
+# Bezpieczeństwo Serwerów i Aplikacji Webowych - Laboratorium.
 
 ## Wymagania
 - Python 3.10+
@@ -33,6 +33,7 @@ python manage.py runserver
 ```
 http://127.0.0.1:8000/
 ```
+
 
 
 
