@@ -202,7 +202,7 @@ if os.environ.get("DJANGO_ENV") == "LOCAL":
 
 # Kiedy https
 else:
-    SESSION_COOKIE_AGE = 30 #wygasanie sesji po 30 sekundach
+    SESSION_COOKIE_AGE = 540 #wygasanie sesji po 30 sekundach
     SESSION_EXPIRE_AT_BROWSER_CLOSE = False
     # --- Secure + HttpOnly ---
     SESSION_COOKIE_SECURE = True
